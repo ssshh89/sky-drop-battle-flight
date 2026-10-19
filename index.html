@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="theme-color" content="#101a22">
+<title>Sky Drop: Battle Flight</title>
+<style>
+:root{color-scheme:dark;--gold:#ffd34e;--orange:#ff7b27;--ink:#101a22}
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#0b131a;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+body{display:grid;place-items:center}
+#game{position:relative;width:min(100vw,56.25vh);height:min(100vh,177.78vw);max-width:480px;max-height:854px;overflow:hidden;background:#88c9d6;box-shadow:0 0 40px #0009;touch-action:manipulation}
+canvas{display:block;width:100%;height:100%}
+.hud{position:absolute;inset:0;pointer-events:none;color:white;text-shadow:0 2px 3px #17232c;display:flex;flex-direction:column;align-items:center;padding:18px 14px}
+.brand{align-self:flex-start;font-weight:1000;font-size:clamp(12px,3.5vw,17px);letter-spacing:1.8px;background:#101a22d9;border:1px solid #ffd34e88;border-radius:8px;padding:7px 10px}
+.brand span{color:var(--gold)}
+.score{font-size:clamp(38px,12vw,58px);font-weight:1000;line-height:1;margin-top:15px}
+.subscore{font-size:12px;letter-spacing:2px;font-weight:800;color:#fffbd7}
+.panel{position:absolute;left:7%;right:7%;top:50%;transform:translateY(-45%);padding:24px 20px;background:linear-gradient(145deg,#172630f5,#0b131af2);border:1px solid #ffd34e99;border-radius:18px;text-align:center;box-shadow:0 12px 35px #0007;pointer-events:auto}
+h1{font-size:clamp(24px,7vw,34px);line-height:1.05;margin:0 0 8px;font-weight:1000;letter-spacing:.4px}
+h1 em{font-style:normal;color:var(--gold)}
+.panel p{color:#d8e1e4;font-size:14px;line-height:1.5;margin:10px 0 18px}
+button{border:0;border-radius:10px;background:linear-gradient(180deg,#ffdb5c,#ff9d2e);color:#182028;font-weight:1000;font-size:16px;padding:13px 20px;width:100%;cursor:pointer;box-shadow:0 4px 0 #a95819;pointer-events:auto}
+button:active{transform:translateY(2px);box-shadow:0 2px 0 #a95819}
+.hint{font-size:11px!important;letter-spacing:1px;text-transform:uppercase;color:#b8c7ce!important;margin:14px 0 0!important}
+.hidden{display:none}
+.bottom{position:absolute;bottom:15px;left:0;right:0;text-align:center;font-size:10px;letter-spacing:1.8px;font-weight:800;color:#ffffffb8;pointer-events:none}
+@media(min-width:600px){#game{border-radius:12px}}
+</style>
+</head>
+<body>
+<div id="game" aria-label="Sky Drop Battle Flight game">
+<canvas id="c" width="432" height="768"></canvas>
+<div class="hud">
+  <div class="brand">SKY DROP <span>/// BATTLE FLIGHT</span></div>
+  <div class="score" id="score">0</div>
+  <div class="subscore">FLIGHT SCORE</div>
+</div>
+<section class="panel" id="start">
+  <h1>SKY DROP<br><em>BATTLE FLIGHT</em></h1>
+  <p>Drop into the zone. Thread the barriers. Keep flying.<br>How long can you survive?</p>
+  <button id="play">DEPLOY</button>
+  <p class="hint">TAP / CLICK / SPACE TO FLAP</p>
+</section>
+<section class="panel hidden" id="over">
+  <h1>MISSION <em>FAILED</em></h1>
+  <p id="result">Flight ended.</p>
+  <button id="again">REDEPLOY</button>
+  <p class="hint">TAP / CLICK / SPACE TO FLAP</p>
+</section>
+<div class="bottom">STAY SHARP • OWN THE SKY</div>
+</div>
+<script>
+(()=>{
+const canvas=document.getElementById('c'),ctx=canvas.getContext('2d');
+const scoreEl=document.getElementById('score'),startPanel=document.getElementById('start'),overPanel=document.getElementById('over'),result=document.getElementById('result');
+const W=432,H=768,ground=690;
+let mode='ready',bird,pipes,score,best=Number(localStorage.getItem('skyDropBest')||0),frame=0,clouds=[];
+function reset(){bird={x:112,y:330,vy:0,rot:0};pipes=[];score=0;frame=0;scoreEl.textContent='0';for(let i=0;i<4;i++)pipes.push({x:500+i*205,gapY:235+Math.random()*235,gap:174,passed:false});}
+function deploy(){reset();mode='playing';startPanel.classList.add('hidden');overPanel.classList.add('hidden');}
+function flap(){if(mode==='ready'){deploy();bird.vy=-6.6;return}if(mode==='over'){deploy();bird.vy=-6.6;return}if(mode==='playing')bird.vy=-6.6;}
+document.getElementById('play').addEventListener('click',e=>{e.stopPropagation();deploy();bird.vy=-6.6});
+document.getElementById('again').addEventListener('click',e=>{e.stopPropagation();deploy();bird.vy=-6.6});
+canvas.addEventListener('pointerdown',e=>{e.preventDefault();flap()});
+document.addEventListener('keydown',e=>{if(['Space','ArrowUp','KeyW'].includes(e.code)){e.preventDefault();if(!e.repeat)flap()}});
+for(let i=0;i<7;i++)clouds.push({x:Math.random()*W,y:55+Math.random()*350,s:.5+Math.random()*.9});
+function endGame(){if(mode!=='playing')return;mode='over';best=Math.max(best,score);localStorage.setItem('skyDropBest',best);result.textContent=`Flight score: ${score} • Best score: ${best}. Ready for another drop?`;overPanel.classList.remove('hidden')}
+function rounded(x,y,w,h,r){ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.fill()}
+function drawBackground(){
+let g=ctx.createLinearGradient(0,0,0,H);g.addColorStop(0,'#63b8d0');g.addColorStop(.62,'#d0e3d0');g.addColorStop(1,'#e8d9a0');ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+clouds.forEach(c=>{c.x-=.22*c.s;if(c.x<-100)c.x=W+70;ctx.fillStyle='#ffffff66';ctx.beginPath();ctx.ellipse(c.x,c.y,34*c.s,12*c.s,0,0,Math.PI*2);ctx.ellipse(c.x+22*c.s,c.y-8*c.s,25*c.s,17*c.s,0,0,Math.PI*2);ctx.ellipse(c.x+44*c.s,c.y,30*c.s,12*c.s,0,0,Math.PI*2);ctx.fill()});
+ctx.fillStyle='#719d76';ctx.beginPath();ctx.moveTo(0,490);ctx.lineTo(80,405);ctx.lineTo(160,475);ctx.lineTo(255,385);ctx.lineTo(350,468);ctx.lineTo(432,405);ctx.lineTo(432,690);ctx.lineTo(0,690);ctx.fill();
+ctx.fillStyle='#47745d';ctx.beginPath();ctx.moveTo(0,555);ctx.lineTo(90,490);ctx.lineTo(180,550);ctx.lineTo(300,470);ctx.lineTo(432,550);ctx.lineTo(432,690);ctx.lineTo(0,690);ctx.fill();
+}
+function drawPipe(p){
+const top=p.gapY-p.gap/2,bot=p.gapY+p.gap/2;
+ctx.fillStyle='#263a38';ctx.fillRect(p.x-3,0,66,top);ctx.fillRect(p.x-3,bot,66,ground-bot);
+ctx.fillStyle='#567c48';ctx.fillRect(p.x,0,60,top);ctx.fillRect(p.x,bot,60,ground-bot);
+ctx.fillStyle='#91b75a';ctx.fillRect(p.x+8,0,9,top);ctx.fillRect(p.x+8,bot,9,ground-bot);
+ctx.fillStyle='#1b2c2b';ctx.fillRect(p.x-7,top-17,74,17);ctx.fillRect(p.x-7,bot,74,17);
+ctx.fillStyle='#779f4f';ctx.fillRect(p.x,top-15,60,12);ctx.fillRect(p.x,bot+2,60,12);
+ctx.fillStyle='#e5c04a';ctx.fillRect(p.x+25,top-14,5,10);ctx.fillRect(p.x+25,bot+4,5,8);
+}
+function drawGround(){ctx.fillStyle='#34463b';ctx.fillRect(0,ground,W,H-ground);ctx.fillStyle='#8d9b4e';ctx.fillRect(0,ground,W,9);for(let x=-((frame*2)%38);x<W;x+=38){ctx.fillStyle='#65744a';ctx.fillRect(x,ground+19,21,5);ctx.fillStyle='#202f2a';ctx.fillRect(x+9,ground+43,18,4)}}
+function drawBird(){
+ctx.save();ctx.translate(bird.x,bird.y);ctx.rotate(bird.rot);
+ctx.fillStyle='#19282c';rounded(-18,-13,39,28,9);
+ctx.fillStyle='#ffb72e';rounded(-16,-15,33,26,9);
+ctx.fillStyle='#e76c26';ctx.beginPath();ctx.ellipse(-5,5,10,6,-.3,0,Math.PI*2);ctx.fill();
+ctx.fillStyle='#ffe16b';ctx.beginPath();ctx.ellipse(-4,-7,12,7,-.3,0,Math.PI*2);ctx.fill();
+ctx.fillStyle='#f6f2dd';ctx.beginPath();ctx.arc(9,-7,7,0,Math.PI*2);ctx.fill();ctx.fillStyle='#17242a';ctx.beginPath();ctx.arc(12,-7,3,0,Math.PI*2);ctx.fill();
+ctx.fillStyle='#f06b25';ctx.beginPath();ctx.moveTo(14,0);ctx.lineTo(27,4);ctx.lineTo(14,8);ctx.closePath();ctx.fill();
+ctx.strokeStyle='#fff0a8';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(-7,-14);ctx.lineTo(-2,-20);ctx.lineTo(3,-14);ctx.stroke();
+ctx.restore();
+}
+function update(){
+frame++;
+if(mode==='playing'){
+bird.vy+=.34;bird.y+=bird.vy;bird.rot=Math.min(.9,Math.max(-.55,bird.vy*.08));
+pipes.forEach(p=>{p.x-=2.65;if(!p.passed&&p.x+60<bird.x){p.passed=true;score++;scoreEl.textContent=score}
+const top=p.gapY-p.gap/2,bot=p.gapY+p.gap/2;
+if(bird.x+13>p.x&&bird.x-13<p.x+60&&(bird.y-10<top||bird.y+10>bot))endGame();
+});
+if(pipes.length&&pipes[0].x<-80){pipes.shift();const last=pipes[pipes.length-1];pipes.push({x:last.x+205,gapY:220+Math.random()*250,gap:174,passed:false})}
+if(bird.y<0||bird.y+13>ground)endGame();
+}else if(mode==='ready'){bird.y=330+Math.sin(frame*.07)*8;bird.rot=Math.sin(frame*.07)*.04}
+}
+function render(){drawBackground();pipes.forEach(drawPipe);drawGround();drawBird();if(mode==='ready'){ctx.fillStyle='#10232b99';rounded(60,560,312,44,10);ctx.fillStyle='#fff';ctx.font='bold 14px system-ui';ctx.textAlign='center';ctx.fillText('TAP DEPLOY TO START YOUR DROP',216,587)}}
+function loop(){update();render();requestAnimationFrame(loop)}
+reset();loop();
+})();
+</script>
+</body>
+</html>
